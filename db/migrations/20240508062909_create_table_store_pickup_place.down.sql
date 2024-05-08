@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS store_pickup_place;
