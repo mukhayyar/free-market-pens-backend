@@ -2,7 +2,10 @@ package models
 
 import (
 	"backend/db"
+	"fmt"
 	"net/http"
+
+	"github.com/lib/pq"
 )
 
 type StorePickupPlace struct {
@@ -46,7 +49,7 @@ func GetAllStorePickupPlace(storeId int) (Response, error) {
     return res, nil
 }
 
-func CreateStorePickupPlace(storeId string, name string) (Response, error) {
+func CreateStorePickupPlace(storeId int, name string) (Response, error) {
     var res Response
 
     con := db.CreateCon()
@@ -66,6 +69,11 @@ func CreateStorePickupPlace(storeId string, name string) (Response, error) {
     var id int64
     err = stmt.QueryRow(storeId, name).Scan(&id)
     if err != nil {
+        if pqErr, ok := err.(*pq.Error); ok {
+            if pqErr.Code.Name() == "unique_store_pickup_place" {
+                return res, fmt.Errorf("a place with the same name already exists")
+            }
+        }
         return res, err
     }
 

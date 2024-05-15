@@ -29,11 +29,16 @@ func GetAllStorePickupPlace(c echo.Context) error {
 }
 
 func CreateStorePickupPlace(c echo.Context) error {
-	storeId := c.FormValue("storeId")
+	storeIdStr := c.FormValue("storeId")
 	name := c.FormValue("name")
 
-	if storeId == "" && name == "" {
+	if storeIdStr == "" && name == "" {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "data can't be empty"})
+	}
+
+	storeId, err := strconv.Atoi(storeIdStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid storeId"})
 	}
 	
 	result, err := models.CreateStorePickupPlace(storeId, name)

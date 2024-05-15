@@ -11,7 +11,7 @@ import (
 func CreateBatch(c echo.Context) error {
 	productIdStr := c.FormValue("productId")
 	pickupPlaceIdStr := c.FormValue("pickupPlaceId")
-	// priceStr := c.FormValue("price")
+	priceStr := c.FormValue("price")
 	stockStr := c.FormValue("stock")
 	pickupDate := c.FormValue("pickupDate")
 	pickupTime := c.FormValue("pickupTime")
@@ -37,20 +37,25 @@ func CreateBatch(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid stock"})
 	}
 
-	// price, err := strconv.ParseFloat(priceStr, 64)
-    // if err != nil {
-    //     return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid price"})
-    // }
+	price, err := strconv.ParseFloat(priceStr, 64)
+    if err != nil {
+        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid price"})
+    }
 	
-	// result, err := models.AddPrice(productId, price)
-	// if err != nil{
-	// 	return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
-	// }
-
-	result, err := models.CreateBatch(productId, pickupPlaceId, stock, pickupDate, pickupTime, closeOrderDate, closeOrderDate)
+	priceResult, err := models.AddPrice(productId, price)
 	if err != nil{
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
+
+	batchResult, err := models.CreateBatch(productId, pickupPlaceId, stock, pickupDate, pickupTime, closeOrderDate, closeOrderDate)
+	if err != nil{
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+	}
+
+	response := map[string]interface{}{
+		"priceResult": priceResult,
+		"batchResult": batchResult,
+	}
 	
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, response)
 }

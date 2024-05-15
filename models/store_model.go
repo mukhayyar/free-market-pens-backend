@@ -2,8 +2,11 @@ package models
 
 import (
 	"backend/db"
+	"database/sql"
 	"fmt"
 	"net/http"
+
+	"github.com/lib/pq"
 )
 
 type Store struct {
@@ -80,12 +83,52 @@ func GetStoreById(storeId int) (Response, error) {
     return res, nil
 }
 
-func CreateStore(userId string, Name string, PhotoProfile string, WhatsappNumber string) (Response, error) {
+func GetMyStore(storeId int) (Response, error) {
+    var store Store
+    var res Response
+
+    con := db.CreateCon()
+    // defer con.Close()
+
+    sqlStatement := `
+        SELECT store_id, photo_profile, name, whatsapp_number 
+        FROM "store" where store_id = $1;`
+    row := con.QueryRow(sqlStatement, storeId)
+
+    err := row.Scan(&store.StoreId, &store.PhotoProfile, &store.Name, &store.WhatsappNumber)
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return res, err
+        }
+        return res, err
+    }    
+
+    res.Success = true
+    res.Status = http.StatusOK
+    res.Message = fmt.Sprintf("Profile '%s' successfully retrieved", store.Name)
+    res.Data = map[string]interface{}{
+        "selling_history": "4 riwayat",
+        "store": map[string]interface{}{
+            "storeId":        store.StoreId,
+            "name":           store.Name,
+            "photoProfile":   store.PhotoProfile,
+            "whatsappNumber": store.WhatsappNumber,
+        },
+    }
+
+    return res, nil
+}
+
+func CreateStore(userId int, name string, photoProfile string, whatsappNumber string) (Response, error) {
     var res Response
 
     con := db.CreateCon()
 
-    sqlStatement := "INSERT INTO \"store\" (user_id, name, photo_profile, whatsapp_number) VALUES($1, $2, $3, $4) RETURNING store_id;"
+    sqlStatement := `
+        INSERT INTO "store" (user_id, name, photo_profile, whatsapp_number) 
+        VALUES($1, $2, $3, $4) 
+        RETURNING store_id;
+    `
 
     stmt, err := con.Prepare(sqlStatement)
     if err != nil {
@@ -94,14 +137,19 @@ func CreateStore(userId string, Name string, PhotoProfile string, WhatsappNumber
     defer stmt.Close()
 
     var id int64
-    err = stmt.QueryRow(userId, Name, PhotoProfile, WhatsappNumber).Scan(&id)
+    err = stmt.QueryRow(userId, name, photoProfile, whatsappNumber).Scan(&id)
     if err != nil {
+        if pqErr, ok := err.(*pq.Error); ok {
+            if pqErr.Code.Name() == "unique_name" {
+                return res, fmt.Errorf("a store with the same name already exists")
+            }
+        }
         return res, err
     }
 
 	res.Success = true
     res.Status = http.StatusOK
-    res.Message = fmt.Sprintf("Success to create new store:%s", Name)
+    res.Message = fmt.Sprintf("Success to create new store:%s", name)
     res.Data = map[string]int64{"LastStoreId": id}
 
     return res, nil

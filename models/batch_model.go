@@ -16,7 +16,9 @@ type Batch struct {
 	PickupTime     string
 }
 
-
+func GetBatchById()  {
+    
+}
 
 func CreateBatch(productId int, pickupPlaceId int, stock int, pickupDate string, pickupTime string, closeOrderDate string, closeOrderTime string) (Response, error) {
     var res Response

@@ -3,9 +3,12 @@ package models
 import (
 	"backend/db"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/lib/pq"
 )
 
 type User struct {
@@ -29,7 +32,7 @@ func GetUser(userId int) (Response, error) {
     sqlStatement := "SELECT * FROM \"user\" where user_id = $1;"
     row := con.QueryRow(sqlStatement, userId)
 
-    err := row.Scan(&user.UserId, &user.Email, &user.Username, &user.WhatsappNumber, &user.FullName, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+    err := row.Scan(&user.UserId, &user.Email, &user.Username, &user.WhatsappNumber, &user.Password, &user.CreatedAt, &user.UpdatedAt)
     if err != nil {
         if err == sql.ErrNoRows {
             return res, err
@@ -46,12 +49,16 @@ func GetUser(userId int) (Response, error) {
 }
 
 
-func CreateUser(email string, username string, whatsappNumber string, fullName string, password string) (Response, error) {
+func CreateUser(email string, username string, whatsappNumber string, password string) (Response, error) {
     var res Response
 
     con := db.CreateCon()
 
-    sqlStatement := "INSERT INTO \"user\" (email, username, whatsapp_number, full_name, password) VALUES($1, $2, $3, $4, $5) RETURNING user_id;"
+    sqlStatement := `
+        INSERT INTO "user" (email, username, whatsapp_number, password) 
+        VALUES($1, $2, $3, $4) 
+        RETURNING user_id;
+    `
 
     stmt, err := con.Prepare(sqlStatement)
     if err != nil {
@@ -60,15 +67,25 @@ func CreateUser(email string, username string, whatsappNumber string, fullName s
     defer stmt.Close()
 
     var id int64
-    err = stmt.QueryRow(email, username, whatsappNumber, fullName, password).Scan(&id)
+    err = stmt.QueryRow(email, username, whatsappNumber, password).Scan(&id)
     if err != nil {
+        if pqErr, ok := err.(*pq.Error); ok {
+            switch pqErr.Constraint {
+            case "unique_email":
+                return res, fmt.Errorf("a user with the same email already exists")
+            case "unique_username":
+                return res, fmt.Errorf("a user with the same username already exists")
+            case "unique_whatsapp_number":
+                return res, fmt.Errorf("a user with the same WhatsApp number already exists")
+            }
+        }
         return res, err
     }
 
 	res.Success = true
     res.Status = http.StatusOK
     res.Message = "Success to Add User!"
-    res.Data = map[string]int64{"LastId": id}
+    res.Data = map[string]int64{"LastInsertId": id}
 
     return res, nil
 }

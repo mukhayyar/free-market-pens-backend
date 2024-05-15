@@ -24,7 +24,7 @@ func Init() *echo.Echo {
 	e.GET("/category", category_controller.GetAllCategory)
 	e.POST("/category", category_controller.CreateCategory)
 
-	e.GET("/store/:storeId", store_controller.GetStoreById)
+	e.GET("/store/:storeId", store_controller.GetMyStore)
 	e.POST("/store", store_controller.CreateStore)
 
 	e.GET("/product/:storeId", product_controller.GetAllMyProduct)

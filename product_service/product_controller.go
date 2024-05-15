@@ -29,13 +29,18 @@ func GetAllMyProduct(c echo.Context) error {
 }
 
 func CreateProduct(c echo.Context) error {
-	storeId := c.FormValue("storeId")
+	storeIdStr := c.FormValue("storeId")
 	photo := c.FormValue("photo")
 	name := c.FormValue("name")
 	description := c.FormValue("description")
 
-	if storeId == "" && photo == "" && name == "" && description == "" {
+	if storeIdStr == "" && photo == "" && name == "" && description == "" {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "data can't be empty"})
+	}
+
+	storeId, err := strconv.Atoi(storeIdStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid storeId"})
 	}
 	
 	result, err := models.CreateProduct(storeId, photo, name, description)

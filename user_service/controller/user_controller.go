@@ -32,10 +32,9 @@ func CreateUser(c echo.Context) error {
 	email := c.FormValue("email")
 	username := c.FormValue("username")
 	whatsappNumber := c.FormValue("whatsappNumber")
-	fullName := c.FormValue("fullName")
 	password := c.FormValue("password")
 
-	result, err := models.CreateUser(email, username, whatsappNumber, fullName, password)
+	result, err := models.CreateUser(email, username, whatsappNumber, password)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
