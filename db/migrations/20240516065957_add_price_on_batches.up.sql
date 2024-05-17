@@ -1,0 +1,2 @@
+ALTER TABLE "batches"
+ADD COLUMN price NUMERIC;

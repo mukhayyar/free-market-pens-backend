@@ -41,17 +41,15 @@ func GetStoreById(storeId int) (Response, error) {
         var product Product
         var productID *int
         var productName *string
-        var productPrice *float64
 
-        err := rows.Scan(&store.StoreId, &store.Name, &store.WhatsappNumber, &store.PhotoProfile, &productID, &productName, &productPrice)
+        err := rows.Scan(&store.StoreId, &store.Name, &store.WhatsappNumber, &store.PhotoProfile, &productID, &productName)
         if err != nil {
             return res, err
         }
     
-        if productID != nil && productName != nil && productPrice != nil{
+        if productID != nil && productName != nil{
             product.ProductId = *productID
-            product.Name = *productName 
-            product.Price = *productPrice 
+            product.Name = *productName
         }
     
         products = append(products, product)

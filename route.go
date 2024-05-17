@@ -24,16 +24,20 @@ func Init() *echo.Echo {
 	e.GET("/category", category_controller.GetAllCategory)
 	e.POST("/category", category_controller.CreateCategory)
 
-	e.GET("/store/:storeId", store_controller.GetMyStore)
-	e.POST("/store", store_controller.CreateStore)
+	// Rute for store
+	e.GET("/stores/:storeId", store_controller.GetMyStore)
+	e.POST("/stores", store_controller.CreateStore)
 
-	e.GET("/product/:storeId", product_controller.GetAllMyProduct)
-	e.POST("/product", product_controller.CreateProduct)
+	// Rute for product
+	e.GET("/stores/:storeId/products", product_controller.GetAllMyProduct)
+	e.GET("/stores/:storeId/products/:productId", product_controller.GetMyProductDetail)
+	e.POST("/stores/:storeId/products", product_controller.CreateProduct)
 
 	e.GET("/storePickupPlace/:storeId", store_pickup_place_controller.GetAllStorePickupPlace)
 	e.POST("/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace)
 
-	e.POST("/batch", batch_controller.CreateBatch)
+	// Create batches
+	e.POST("/stores/:storeId/products/:productId", batch_controller.CreateBatch)
 
 	// e.GET("/user/:id", getUser)
 	// e.PUT("/users/:id", updateUser)

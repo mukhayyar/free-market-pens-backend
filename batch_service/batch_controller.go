@@ -9,16 +9,14 @@ import (
 )
 
 func CreateBatch(c echo.Context) error {
-	productIdStr := c.FormValue("productId")
+	productIdStr := c.Param("productId")
 	pickupPlaceIdStr := c.FormValue("pickupPlaceId")
 	priceStr := c.FormValue("price")
 	stockStr := c.FormValue("stock")
-	pickupDate := c.FormValue("pickupDate")
 	pickupTime := c.FormValue("pickupTime")
-	closeOrderDate := c.FormValue("closeOrderDate")
 	closeOrderTime := c.FormValue("closeOrderTime")
 
-	if productIdStr == "" && pickupPlaceIdStr == "" && stockStr == "" && pickupDate == "" && pickupTime == "" && closeOrderDate == "" && closeOrderTime == "" {
+	if productIdStr == "" && pickupPlaceIdStr == "" && stockStr == "" && priceStr == "" && pickupTime == "" && closeOrderTime == "" {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "data can't be empty"})
 	}
 
@@ -41,19 +39,13 @@ func CreateBatch(c echo.Context) error {
     if err != nil {
         return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid price"})
     }
-	
-	priceResult, err := models.AddPrice(productId, price)
-	if err != nil{
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
-	}
 
-	batchResult, err := models.CreateBatch(productId, pickupPlaceId, stock, pickupDate, pickupTime, closeOrderDate, closeOrderDate)
+	batchResult, err := models.CreateBatch(productId, pickupPlaceId, stock, price, pickupTime, closeOrderTime)
 	if err != nil{
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
 
 	response := map[string]interface{}{
-		"priceResult": priceResult,
 		"batchResult": batchResult,
 	}
 	
