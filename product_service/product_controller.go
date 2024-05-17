@@ -8,6 +8,18 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+func GetAllProduct(c echo.Context) error {
+	closeOrderDate := c.FormValue("closeOrderDate")
+	pickupDate := c.FormValue("pickupDate")
+
+	result, err := models.GetAllProduct(closeOrderDate, pickupDate)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, result)
+}
+
 func GetMyProductDetail(c echo.Context) error {
 	productIdStr := c.Param("productId")
 
@@ -24,7 +36,7 @@ func GetMyProductDetail(c echo.Context) error {
 	if err != nil{
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
-
+	
 	batchResult, err := models.GetAllBatch(productId)
 	if err != nil{
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
@@ -75,6 +87,29 @@ func CreateProduct(c echo.Context) error {
 	
 	result, err := models.CreateProduct(storeId, photo, name, description)
 	if err != nil{
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, result)
+}
+
+func UpdateProduct(c echo.Context) error {
+	productIdStr := c.Param("productId")
+	photo := c.FormValue("photo")
+	name := c.FormValue("name")
+	description := c.FormValue("description")
+	
+	if productIdStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "productId is required"})
+	}
+	
+	productId, err := strconv.Atoi(productIdStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid productId"})
+	}
+	
+	result, err := models.UpdateProduct(productId, photo, name, description)
+	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
 	

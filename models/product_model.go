@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/lib/pq"
 )
@@ -102,23 +104,74 @@ func GetAllMyProduct(storeId int) (Response, error) {
     return res, nil
 }
 
-// func GetAllProduct(closeOrderDate string, pickupDate string) (Response, error) {
-//     var product Product
-//     var productList []Product
-//     var res Response
+func GetAllProduct(closeOrderDate string, pickupDate string) (Response, error) {
+    var product Product
+    var batch Batch
+    var productList []Product
+    var res Response
 
-//     con := db.CreateCon()
-//     // defer con.Close()
+    con := db.CreateCon()
+    // defer con.Close()
 
-//     sqlStatements := `
-//         SELECT p.product_id, p.name, b.price
-//         FROM product
-//         LEFT JOIN batch b ON p.product_id = b.product_id
-//         WHERE b.close_order_date = $1 AND b.pickup_date = $2;
-//     `
+    sqlStatement := `
+        SELECT p.product_id, p.photo, p.name, b.price
+        FROM batches b
+        LEFT JOIN product p ON b.product_id = p.product_id
+    `
+    
+    var conditions []string
+    var params []interface{}
+    if closeOrderDate != "" {
+        conditions = append(conditions, "DATE(b.close_order_time) = $1"+strconv.Itoa(len(params)+1))
+        params = append(params, closeOrderDate)
+    }
+    if pickupDate != "" {
+        conditions = append(conditions, "DATE(b.pickup_time) = $2"+strconv.Itoa(len(params)+1))
+        params = append(params, pickupDate)
+    }
 
+    if len(conditions) > 0 {
+        sqlStatement += " WHERE " + strings.Join(conditions, " AND ") + ";"
+    }
 
-// }
+    rows, err := con.Query(sqlStatement, params...)
+    if err != nil {
+        return res, err
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        err = rows.Scan(&product.ProductId, &product.Photo, &product.Name, &batch.Price)
+        if err != nil {
+            return res, err
+        }
+        productList = append(productList, product)
+    }
+
+    var products []map[string]interface{}
+    for _, prod := range productList {
+        productData := map[string]interface{}{
+            "id":    prod.ProductId,
+            "photo": prod.Photo,
+            "name":  prod.Name,
+            "price": batch.Price,
+        }
+        products = append(products, productData)
+    }
+
+    res.Success = true
+    res.Status = http.StatusOK
+    res.Message = "Products Home successfully retrieved"
+    res.Data = map[string]interface{}{
+        "filter": map[string]interface{}{
+            "close_order": closeOrderDate,
+            "pickup_date": pickupDate,
+        },
+        "products": products,
+    }
+
+    return res, nil
+}
 
 func CreateProduct(storeId int, photo string, name string, description string) (Response, error) {
     var res Response
@@ -127,7 +180,7 @@ func CreateProduct(storeId int, photo string, name string, description string) (
 
     sqlStatement := `
         INSERT INTO "product" (store_id, photo, name, description) 
-        VALUES($1, $2, $3, $4, 0) 
+        VALUES($1, $2, $3, $4) 
         RETURNING product_id;
     `
 
@@ -156,42 +209,56 @@ func CreateProduct(storeId int, photo string, name string, description string) (
     return res, nil
 }
 
-// func AddPrice(productId int, price float64) (Response, error) {
-//     var res Response
+func UpdateProduct(productId int, photo string, name string, description string) (Response, error) {
+    var res Response
 
-//     con := db.CreateCon()
+    con := db.CreateCon()
 
-//     sqlStatement := `
-//         UPDATE "product"
-//         SET price = $2
-//         WHERE product_id = $1;
-//     `
-//     stmt, err := con.Prepare(sqlStatement)
-//     if err != nil {
-//         return res, err
-//     }
-//     defer stmt.Close()
+    var updateValues []interface{}
+    var sqlValues []string
 
-//     // Here, we pass the arguments directly to Exec
-//     result, err := stmt.Exec(productId, price)
-//     if err != nil {
-//         return res, err
-//     }
+    columns := []struct {
+        name  string
+        value string
+    }{
+        {"photo", photo},
+        {"name", name},
+        {"description", description},
+    }
 
-//     // Use RowsAffected to get the number of affected rows
-//     rowAffected, err := result.RowsAffected()
-//     if err != nil {
-//         return res, err
-//     }
+    for _, col := range columns {
+        if col.value != "" {
+            sqlValues = append(sqlValues, col.name+" = $"+strconv.Itoa(len(updateValues)+1))
+            updateValues = append(updateValues, col.value)
+        }
+    }
 
-//     res.Success = true
-//     res.Status = http.StatusOK
-//     res.Message = "Success add price!"
-//     res.Data = map[string]int64{"row_affected": rowAffected}
+    sqlStatement := "UPDATE \"product\" SET " + strings.Join(sqlValues, ", ") + " WHERE product_id = $1" + strconv.Itoa(len(updateValues)+1) + ";"
+    updateValues = append(updateValues, productId)
 
-//     return res, nil
-// }
+    stmt, err := con.Prepare(sqlStatement)
+    if err != nil {
+        return res, err
+    }
+    defer stmt.Close()
 
+    result, err := stmt.Exec(updateValues...)
+    if err != nil {
+        return res, err
+    }
+
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        return res, err
+    }
+
+    res.Success = true
+    res.Status = http.StatusOK
+    res.Message = "Success update product!"
+    res.Data = map[string]int64{"rowsAffected   ": rowsAffected}
+
+    return res, nil
+}
 
 // func DeleteUser(userId int) (Response, error) {
 // 	var res Response

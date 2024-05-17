@@ -31,13 +31,18 @@ func Init() *echo.Echo {
 	// Rute for product
 	e.GET("/stores/:storeId/products", product_controller.GetAllMyProduct)
 	e.GET("/stores/:storeId/products/:productId", product_controller.GetMyProductDetail)
+	e.PUT("/stores/:storeId/products/:productId", product_controller.UpdateProduct)
 	e.POST("/stores/:storeId/products", product_controller.CreateProduct)
 
 	e.GET("/storePickupPlace/:storeId", store_pickup_place_controller.GetAllStorePickupPlace)
 	e.POST("/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace)
-
+	
 	// Create batches
 	e.POST("/stores/:storeId/products/:productId", batch_controller.CreateBatch)
+	
+	// product
+	e.GET("/products", product_controller.GetAllProduct)
+
 
 	// e.GET("/user/:id", getUser)
 	// e.PUT("/users/:id", updateUser)
