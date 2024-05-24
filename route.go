@@ -24,25 +24,31 @@ func Init() *echo.Echo {
 	e.GET("/category", category_controller.GetAllCategory)
 	e.POST("/category", category_controller.CreateCategory)
 
-	// Rute for store
+	// store for seller
 	e.GET("/stores/:storeId", store_controller.GetMyStore)
 	e.POST("/stores", store_controller.CreateStore)
-
-	// Rute for product
+	e.PUT("/stores/:storeId", store_controller.UpdateStore)
+	e.DELETE("/stores/:storeId", store_controller.CloseStore)
+	
+	// store for buyer
+	e.GET("/home/:storeId", store_controller.GetStore)
+	
+	// product for seller
 	e.GET("/stores/:storeId/products", product_controller.GetAllMyProduct)
 	e.GET("/stores/:storeId/products/:productId", product_controller.GetMyProductDetail)
-	e.PUT("/stores/:storeId/products/:productId", product_controller.UpdateProduct)
 	e.POST("/stores/:storeId/products", product_controller.CreateProduct)
+	e.PUT("/stores/:storeId/products/:productId", product_controller.UpdateProduct)
+	e.DELETE("/stores/:storeId/products/:productId", product_controller.DeleteProduct)
+
+	// product for buyer
+	e.GET("/products", product_controller.GetAllProduct)
 
 	e.GET("/storePickupPlace/:storeId", store_pickup_place_controller.GetAllStorePickupPlace)
 	e.POST("/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace)
 	
-	// Create batches
+	// batches
 	e.POST("/stores/:storeId/products/:productId", batch_controller.CreateBatch)
-	
-	// product
-	e.GET("/products", product_controller.GetAllProduct)
-
+	e.PUT("/stores/:storeId/products/:productId/:batchId", batch_controller.UpdateBatch)
 
 	// e.GET("/user/:id", getUser)
 	// e.PUT("/users/:id", updateUser)

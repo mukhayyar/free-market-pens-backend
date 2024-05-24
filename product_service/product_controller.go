@@ -76,7 +76,7 @@ func CreateProduct(c echo.Context) error {
 	name := c.FormValue("name")
 	description := c.FormValue("description")
 
-	if storeIdStr == "" && photo == "" && name == "" && description == "" {
+	if storeIdStr == "" || photo == "" || name == "" || description == "" {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "data can't be empty"})
 	}
 
@@ -113,5 +113,25 @@ func UpdateProduct(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
 	
+	return c.JSON(http.StatusOK, result)
+}
+
+func DeleteProduct(c echo.Context) error {
+	productIdStr := c.Param("productId")
+
+	if productIdStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "productId is required"})
+	}
+
+	productId, err := strconv.Atoi(productIdStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid productId"})
+	}
+
+	result, err := models.DeleteProduct(productId)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+	}
+
 	return c.JSON(http.StatusOK, result)
 }

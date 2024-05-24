@@ -7,8 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/lib/pq"
+	"time"
 )
 
 type Product struct {
@@ -18,6 +17,7 @@ type Product struct {
 	Photo            string
     CategoryId       int
     Description      string
+    DeletedAt        string
 }
 
 func GetMyProductDetail(productId int) (Response, error) {
@@ -30,7 +30,7 @@ func GetMyProductDetail(productId int) (Response, error) {
     sqlStatement := `
         SELECT product_id, photo, name, description
         FROM "product"
-        WHERE product_id = $1;
+        WHERE product_id = $1 AND deleted_at IS NULL;
     `
     row := con.QueryRow(sqlStatement, productId)
 
@@ -58,50 +58,75 @@ func GetMyProductDetail(productId int) (Response, error) {
 }
 
 func GetAllMyProduct(storeId int) (Response, error) {
-    var product Product
-    var productList []Product
-    var res Response
+	var res Response
 
-    con := db.CreateCon()
-    // defer con.Close()
+	con := db.CreateCon()
+	// defer con.Close()
 
-    sqlStatement := `
-        SELECT product_id, store_id, name
-        FROM product
-        WHERE store_id = $1;
+	var storeName string
+	storeNameQuery := `SELECT name FROM "store" WHERE store_id = $1`
+	err := con.QueryRow(storeNameQuery, storeId).Scan(&storeName)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			res.Success = false
+			res.Status = http.StatusNotFound
+			res.Message = "Store not found"
+			return res, nil
+		}
+		return res, err
+	}
+
+	sqlStatement := `
+        SELECT p.product_id, p.store_id, p.name, p.photo, b.price
+        FROM product p
+        LEFT JOIN batches b ON p.product_id = b.product_id
+        WHERE p.store_id = $1 AND p.deleted_at IS NULL;
     `
-    rows, err := con.Query(sqlStatement, storeId)
-    if err != nil {
-        return res, err
-    }
-    defer rows.Close()
+	rows, err := con.Query(sqlStatement, storeId)
+	if err != nil {
+		return res, err
+	}
+	defer rows.Close()
 
-    for rows.Next() {
-        err = rows.Scan(&product.ProductId, &product.StoreId, &product.Name)
-        if err != nil {
-            return res, err
-        }
-        productList = append(productList, product)
-    }
+	var productList []map[string]interface{}
+	for rows.Next() {
+		var product Product
+		var price sql.NullFloat64
 
-    var products []map[string]interface{}
-    for _, prod := range productList {
-        productData := map[string]interface{}{
-            "id":    prod.ProductId,
-            "name":  prod.Name,
-        }
-        products = append(products, productData)
-    }
+		err = rows.Scan(&product.ProductId, &product.StoreId, &product.Name, &product.Photo, &price)
+		if err != nil {
+			return res, err
+		}
 
-    res.Success = true
-    res.Status = http.StatusOK
-    res.Message = "Products Home successfully retrieved"
-    res.Data = map[string]interface{}{
-        "storeId":   storeId,
-        "products": products,
-    }
+		var priceValue interface{}
+		if price.Valid {
+			priceValue = price.Float64
+		} else {
+			priceValue = ""
+		}
 
-    return res, nil
+		productData := map[string]interface{}{
+			"id":    product.ProductId,
+			"name":  product.Name,
+			"photo": product.Photo,
+			"price": priceValue,
+		}
+		productList = append(productList, productData)
+	}
+
+	if err = rows.Err(); err != nil {
+		return res, err
+	}
+
+	res.Success = true
+	res.Status = http.StatusOK
+	res.Message = fmt.Sprintf("Success to show list product of store: %s", storeName)
+	res.Data = map[string]interface{}{
+		"storeId":  storeId,
+		"products": productList,
+	}
+
+	return res, nil
 }
 
 func GetAllProduct(closeOrderDate string, pickupDate string) (Response, error) {
@@ -178,36 +203,80 @@ func CreateProduct(storeId int, photo string, name string, description string) (
 
     con := db.CreateCon()
 
+    // Kalo produk di toko yang sama ada
+    var existingProductId int64
+    var deletedAt sql.NullTime
+    checkProductQuery := `
+        SELECT product_id, deleted_at
+        FROM "product"
+        WHERE store_id = $1 AND name = $2;
+    `
+    err := con.QueryRow(checkProductQuery, storeId, name).Scan(&existingProductId, &deletedAt)
+    if err != nil && err != sql.ErrNoRows {
+        return res, err
+    }
+
+    // Nama produknya sama dan tidak dihapus
+    if existingProductId != 0 && !deletedAt.Valid {
+        res.Success = false
+        res.Status = http.StatusConflict
+        res.Message = "A product with the same name already exists"
+        return res, nil
+    }
+
+    // Nama produknya sama, tapi udah dihapus
+    if existingProductId != 0 && deletedAt.Valid {
+        updateQuery := `
+            UPDATE "product"
+            SET deleted_at = NULL
+            WHERE product_id = $1 AND store_id = $2;
+        `
+        stmt, err := con.Prepare(updateQuery)
+        if err != nil {
+            return res, err
+        }
+        defer stmt.Close()
+
+        _, err = stmt.Exec(existingProductId, storeId)
+        if err != nil {
+            return res, err
+        }
+
+        res.Success = true
+        res.Status = http.StatusOK
+        res.Message = "Success to update and restore product!"
+        res.Data = map[string]int64{"RestoredProductId": existingProductId}
+        return res, nil
+    }
+
+    // Produk tidak ada sebelumnya
     sqlStatement := `
-        INSERT INTO "product" (store_id, photo, name, description) 
-        VALUES($1, $2, $3, $4) 
+        INSERT INTO "product" (store_id, photo, name, description)
+        VALUES ($1, $2, $3, $4)
         RETURNING product_id;
     `
-
     stmt, err := con.Prepare(sqlStatement)
     if err != nil {
         return res, err
     }
     defer stmt.Close()
 
-    var id int64
-    err = stmt.QueryRow(storeId, photo, name, description).Scan(&id)
+    var newProductId int64
+    err = stmt.QueryRow(storeId, photo, name, description).Scan(&newProductId)
     if err != nil {
-        if pqErr, ok := err.(*pq.Error); ok {
-            if pqErr.Code.Name() == "unique_product_name" {
-                return res, fmt.Errorf("a product with the same name already exists")
-            }
-        }
         return res, err
     }
 
-	res.Success = true
+    res.Success = true
     res.Status = http.StatusOK
     res.Message = "Success to add product!"
-    res.Data = map[string]int64{"LastProductId": id}
+    res.Data = map[string]int64{"LastProductId": newProductId}
 
     return res, nil
 }
+
+
+
 
 func UpdateProduct(productId int, photo string, name string, description string) (Response, error) {
     var res Response
@@ -233,8 +302,16 @@ func UpdateProduct(productId int, photo string, name string, description string)
         }
     }
 
-    sqlStatement := "UPDATE \"product\" SET " + strings.Join(sqlValues, ", ") + " WHERE product_id = $1" + strconv.Itoa(len(updateValues)+1) + ";"
+    if len(sqlValues) == 0 {
+        res.Success = false
+        res.Status = http.StatusBadRequest
+        res.Message = "No data to update"
+        return res, fmt.Errorf("no data to update")
+    }
+
     updateValues = append(updateValues, productId)
+
+    sqlStatement := "UPDATE \"product\" SET " + strings.Join(sqlValues, ", ") + " WHERE product_id = $" + strconv.Itoa(len(updateValues)) + ";"
 
     stmt, err := con.Prepare(sqlStatement)
     if err != nil {
@@ -250,7 +327,14 @@ func UpdateProduct(productId int, photo string, name string, description string)
     rowsAffected, err := result.RowsAffected()
     if err != nil {
         return res, err
-    }
+    }   
+
+    if rowsAffected == 0 {
+		res.Status = http.StatusNotFound
+		res.Message = "No product found with the given id"
+		res.Success = false
+		return res, fmt.Errorf("no product found with the given id")
+	}
 
     res.Success = true
     res.Status = http.StatusOK
@@ -260,31 +344,36 @@ func UpdateProduct(productId int, photo string, name string, description string)
     return res, nil
 }
 
-// func DeleteUser(userId int) (Response, error) {
-// 	var res Response
+func DeleteProduct(productId int) (Response, error) {
+	var res Response
 
-// 	con := db.CreateCon()
+	con := db.CreateCon()
 
-// 	sqlStatement := "DELETE FROM \"user\" WHERE user_id = $1;"
+    deletedAt := time.Now()
+	sqlStatement := `
+        UPDATE "product" SET deleted_at = $1 
+        WHERE product_id = $2;
+    `
 
-// 	stmt, err := con.Prepare(sqlStatement)
-// 	if err != nil {
-// 		return res, err
-// 	} 
+	stmt, err := con.Prepare(sqlStatement)
+	if err != nil {
+		return res, err
+	} 
 	
-// 	result, err := stmt.Exec(userId)
-// 	if err != nil {
-// 		return res, err
-// 	}
+	result, err := stmt.Exec(deletedAt, productId)
+	if err != nil {
+		return res, err
+	}
 	
-// 	rowsAffected, err := result.RowsAffected()
-// 	if err != nil {
-// 		return res, err
-// 	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return res, err
+	}
 
-// 	res.Status = http.StatusOK
-// 	res.Message = "Success Delete User!"
-// 	res.Data = map[string]int64{"rows": rowsAffected}
+    res.Success = true
+	res.Status = http.StatusOK
+	res.Message = "Success delete product!"
+	res.Data = map[string]int64{"rows": rowsAffected}
 
-// 	return res, nil
-// }
+	return res, nil
+}

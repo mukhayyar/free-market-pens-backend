@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -15,21 +18,46 @@ type Store struct {
 	Name       		string
 	PhotoProfile 	string
 	WhatsappNumber  string
+    ClosedAt       string
 }
 
-func GetStoreById(storeId int) (Response, error) {
+func GetStore(storeId int) (Response, error) {
     var store Store
-    var products []Product
     var res Response
 
     con := db.CreateCon()
     // defer con.Close()
 
+    checkClosedStatement := `SELECT closed_at FROM store WHERE store_id = $1;`
+    var closedAt sql.NullTime
+    err := con.QueryRow(checkClosedStatement, storeId).Scan(&closedAt)
+    if err != nil {
+        if err == sql.ErrNoRows {
+            res.Success = false
+            res.Status = http.StatusNotFound
+            res.Message = "Store not found"
+            res.Data = nil
+            return res, nil
+        }
+        return res, err
+    }
+
+    if closedAt.Valid {
+        res.Success = false
+        res.Status = http.StatusNotFound
+        res.Message = "Store has been closed"
+        res.Data = nil
+        return res, nil
+    }
+
     sqlStatement := `
-        SELECT s.store_id, s.name AS store_name, s.whatsapp_number, s.photo_profile, p.product_id, p.name AS product_name, p.price
+        SELECT s.store_id, s.name AS store_name, s.whatsapp_number, s.photo_profile, 
+               p.product_id, p.name AS product_name, p.photo AS product_photo, 
+               b.batch_id, b.price
         FROM store s
         LEFT JOIN product p ON s.store_id = p.store_id
-        WHERE s.store_id = $1;
+        LEFT JOIN batches b ON p.product_id = b.product_id
+        WHERE s.store_id = $1 AND p.deleted_at IS NULL;
     `
     rows, err := con.Query(sqlStatement, storeId)
     if err != nil {
@@ -37,45 +65,44 @@ func GetStoreById(storeId int) (Response, error) {
     }
     defer rows.Close()
 
-    for rows.Next() {
-        var product Product
-        var productID *int
-        var productName *string
+    var productList []map[string]interface{}
+    storeData := map[string]interface{}{}
 
-        err := rows.Scan(&store.StoreId, &store.Name, &store.WhatsappNumber, &store.PhotoProfile, &productID, &productName)
+    for rows.Next() {
+        var productId *int
+        var batchId *int
+        var productName *string
+        var productPhoto *string
+        var productPrice *float64
+
+        err := rows.Scan(&store.StoreId, &store.Name, &store.WhatsappNumber, &store.PhotoProfile, 
+                         &productId, &productName, &productPhoto, &batchId, &productPrice)
         if err != nil {
             return res, err
         }
-    
-        if productID != nil && productName != nil{
-            product.ProductId = *productID
-            product.Name = *productName
+
+        if productId != nil && batchId != nil && productName != nil && productPrice != nil {
+            productList = append(productList, map[string]interface{}{
+                "product_id": *productId,
+                "batch_id":   *batchId,
+                "name":       *productName,
+                "photo":      *productPhoto,
+                "price":      *productPrice,
+            })
         }
-    
-        products = append(products, product)
-    }
-    
-
-    storeData := map[string]interface{}{
-        "store_id":       store.StoreId,
-        "store_name":     store.Name,
-        "whatsapp_number": store.WhatsappNumber,
-        "profile_photo":  store.PhotoProfile,
     }
 
-    // productsData := map[string]interface{}{
-    //     "store_id":       store.StoreId,
-    //     "store_name":     store.Name,
-    //     "whatsapp_number": store.WhatsappNumber,
-    //     "profile_photo":  store.PhotoProfile,
-    // }
+    storeData["store_id"] = store.StoreId
+    storeData["store_name"] = store.Name
+    storeData["whatsapp_number"] = store.WhatsappNumber
+    storeData["profile_photo"] = store.PhotoProfile
 
     res.Success = true
     res.Status = http.StatusOK
     res.Message = fmt.Sprintf("Profile '%s' successfully retrieved", store.Name)
-    res.Data = map[string]any{
-        "store": storeData,
-        "products": products,
+    res.Data = map[string]interface{}{
+        "store":    storeData,
+        "products": productList,
     }
 
     return res, nil
@@ -84,22 +111,34 @@ func GetStoreById(storeId int) (Response, error) {
 func GetMyStore(storeId int) (Response, error) {
     var store Store
     var res Response
+    var closedAt sql.NullTime
 
     con := db.CreateCon()
     // defer con.Close()
 
     sqlStatement := `
-        SELECT store_id, photo_profile, name, whatsapp_number 
-        FROM "store" where store_id = $1;`
+        SELECT store_id, photo_profile, name, whatsapp_number, closed_at
+        FROM "store" 
+        WHERE store_id = $1;
+    `
     row := con.QueryRow(sqlStatement, storeId)
 
-    err := row.Scan(&store.StoreId, &store.PhotoProfile, &store.Name, &store.WhatsappNumber)
+    err := row.Scan(&store.StoreId, &store.PhotoProfile, &store.Name, &store.WhatsappNumber, &closedAt)
     if err != nil {
         if err == sql.ErrNoRows {
-            return res, err
+            res.Success = false
+            res.Status = http.StatusNotFound
+            res.Message = "Store not found"
+            res.Data = nil
+            return res, nil
         }
         return res, err
     }    
+
+    storeStatus := "open"
+    if closedAt.Valid{
+        storeStatus = "closed"
+    }
 
     res.Success = true
     res.Status = http.StatusOK
@@ -111,6 +150,7 @@ func GetMyStore(storeId int) (Response, error) {
             "name":           store.Name,
             "photoProfile":   store.PhotoProfile,
             "whatsappNumber": store.WhatsappNumber,
+            "status": storeStatus,
         },
     }
 
@@ -153,83 +193,192 @@ func CreateStore(userId int, name string, photoProfile string, whatsappNumber st
     return res, nil
 }
 
-// func UpdateUser(userId int, email string, username string, whatsappNumber string, fullName string, password string) (Response, error) {
-//     var res Response
+func UpdateStore(storeId int, storeName string, photoProfile string, whatsappNumber string) (Response, error) {
+    var res Response
 
-//     con := db.CreateCon()
+    con := db.CreateCon()
+    // defer con.Close()
 
-//     var updateValues []interface{}
-//     var sqlValues []string
+    var updateValues []interface{}
+    var sqlValues []string
 
-//     columns := []struct {
-//         name  string
-//         value string
-//     }{
-//         {"email", email},
-//         {"username", username},
-//         {"whatsapp_number", whatsappNumber},
-//         {"full_name", fullName},
-//         {"password", password},
-//     }
+    columns := []struct {
+        name  string
+        value string
+    }{
+        {"name", storeName},
+        {"photo_profile", photoProfile},
+        {"whatsapp_number", whatsappNumber},
+    }
 
-//     for _, col := range columns {
-//         if col.value != "" {
-//             sqlValues = append(sqlValues, col.name+" = $"+strconv.Itoa(len(updateValues)+1))
-//             updateValues = append(updateValues, col.value)
-//         }
-//     }
+    // Check for duplicate store name
+    // if storeName != "" {
+    //     var existingStoreId int 
+    //     err := con.QueryRow("SELECT store_id FROM \"store\" WHERE name = $1 AND store_id != $2", storeName, storeId).Scan(&existingStoreId)
+    //     if err != nil && err != sql.ErrNoRows {
+    //         return res, err
+    //     }
+    //     if existingStoreId != 0 {
+    //         return res, fmt.Errorf("a store with the same name already exists")
+    //     }
+    // }
 
-//     sqlStatement := "UPDATE \"user\" SET " + strings.Join(sqlValues, ", ") + " WHERE user_id = $" + strconv.Itoa(len(updateValues)+1) + ";"
-//     updateValues = append(updateValues, userId)
+    // Prepare SQL set clauses and parameter values
+    for _, col := range columns {
+        if col.value != "" {
+            sqlValues = append(sqlValues, col.name+" = $"+strconv.Itoa(len(updateValues)+1))
+            updateValues = append(updateValues, col.value)
+        }
+    }
 
-//     stmt, err := con.Prepare(sqlStatement)
-//     if err != nil {
-//         return res, err
-//     }
-//     defer stmt.Close()
+    // Check if there are values to update
+    if len(sqlValues) == 0 {
+        res.Success = false
+        res.Status = http.StatusBadRequest
+        res.Message = "No data to update"
+        return res, fmt.Errorf("no data to update")
+    }
 
-//     result, err := stmt.Exec(updateValues...)
-//     if err != nil {
-//         return res, err
-//     }
+    // Add storeId to parameter values
+    updateValues = append(updateValues, storeId)
 
-//     rowsAffected, err := result.RowsAffected()
-//     if err != nil {
-//         return res, err
-//     }
+    sqlStatement := "UPDATE \"store\" SET " + strings.Join(sqlValues, ", ") + " WHERE store_id = $" + strconv.Itoa(len(updateValues)) + ";"
 
-//     res.Status = http.StatusOK
-//     res.Message = "Success Update User!"
-//     res.Data = map[string]int64{"rowsAffected   ": rowsAffected}
+    stmt, err := con.Prepare(sqlStatement)
+    if err != nil {
+        return res, err
+    }
+    defer stmt.Close()
 
-//     return res, nil
-// }
+    result, err := stmt.Exec(updateValues...)
+    if err != nil {
+        return res, err
+    }
 
-// func DeleteUser(userId int) (Response, error) {
-// 	var res Response
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        return res, err
+    }
 
-// 	con := db.CreateCon()
+    res.Success = true
+    res.Status = http.StatusOK
+    res.Message = "Success update store!"
+    res.Data = map[string]int64{"rowsAffected": rowsAffected}
 
-// 	sqlStatement := "DELETE FROM \"user\" WHERE user_id = $1;"
+    return res, nil
+}
 
-// 	stmt, err := con.Prepare(sqlStatement)
-// 	if err != nil {
-// 		return res, err
-// 	} 
+func OpenStore(storeId int) (Response, error) {
+	var res Response
+
+	con := db.CreateCon()
+    // defer con.Close()
+
+    var closedAt sql.NullTime
+    checkSql := `
+        SELECT closed_at FROM "store" WHERE store_id = $1;
+    `
+
+    err := con.QueryRow(checkSql, storeId).Scan(&closedAt)
+    if err != nil {
+		if err == sql.ErrNoRows {
+			res.Success = false
+			res.Status = http.StatusNotFound
+			res.Message = "Store not found!"
+			return res, nil
+		}
+		return res, err
+	}
+
+    if !closedAt.Valid {
+		res.Success = false
+		res.Status = http.StatusConflict
+		res.Message = "Store is already open!"
+		return res, nil
+	}
+
+	sqlStatement := `
+        UPDATE "store" SET closed_at = NULL 
+        WHERE store_id = $1;
+    `
+
+	stmt, err := con.Prepare(sqlStatement)
+	if err != nil {
+		return res, err
+	} 
 	
-// 	result, err := stmt.Exec(userId)
-// 	if err != nil {
-// 		return res, err
-// 	}
+	result, err := stmt.Exec(storeId)
+	if err != nil {
+		return res, err
+	}
 	
-// 	rowsAffected, err := result.RowsAffected()
-// 	if err != nil {
-// 		return res, err
-// 	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return res, err
+	}
 
-// 	res.Status = http.StatusOK
-// 	res.Message = "Success Delete User!"
-// 	res.Data = map[string]int64{"rows": rowsAffected}
+    res.Success = true
+	res.Status = http.StatusOK
+	res.Message = "Success to open the store!"
+	res.Data = map[string]int64{"rows": rowsAffected}
 
-// 	return res, nil
-// }
+	return res, nil
+}
+
+func CloseStore(storeId int) (Response, error) {
+	var res Response
+
+	con := db.CreateCon()
+    // defer con.Close()
+
+    var closedAt sql.NullTime
+    checkSql := `
+        SELECT closed_at FROM "store" WHERE store_id = $1;
+    `
+
+    err := con.QueryRow(checkSql, storeId).Scan(&closedAt)
+    if err != nil {
+		if err == sql.ErrNoRows {
+			res.Success = false
+			res.Status = http.StatusNotFound
+			res.Message = "Store not found!"
+			return res, nil
+		}
+		return res, err
+	}
+
+    if closedAt.Valid {
+		res.Success = false
+		res.Status = http.StatusConflict
+		res.Message = "Store is already closed!"
+		return res, nil
+	}
+
+    closedAt = sql.NullTime{Time: time.Now(), Valid: true}
+	sqlStatement := `
+        UPDATE "store" SET closed_at = $1 
+        WHERE store_id = $2;
+    `
+
+	stmt, err := con.Prepare(sqlStatement)
+	if err != nil {
+		return res, err
+	} 
+	
+	result, err := stmt.Exec(closedAt, storeId)
+	if err != nil {
+		return res, err
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return res, err
+	}
+
+    res.Success = true
+	res.Status = http.StatusOK
+	res.Message = "Success to close the store!"
+	res.Data = map[string]int64{"rows": rowsAffected}
+
+	return res, nil
+}

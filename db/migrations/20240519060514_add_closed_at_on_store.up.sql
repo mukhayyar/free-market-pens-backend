@@ -1,0 +1,2 @@
+ALTER TABLE "store"
+ADD COLUMN closed_at TIMESTAMP;

@@ -2,7 +2,9 @@ package models
 
 import (
 	"backend/db"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -82,7 +84,7 @@ func CreateBatch(productId int, pickupPlaceId int, stock int, price float64, pic
     con := db.CreateCon()
 
     sqlStatement := `
-		INSERT INTO "batches" (product_id, store_pickup_place_id, stock, price, close_order_time, pickup_time) 
+		INSERT INTO "batches" (product_id, store_pickup_place_id, stock, price, pickup_time, close_order_time) 
 		VALUES($1, $2, $3, $4, $5, $6) RETURNING batch_id;
 	`
 
@@ -102,6 +104,87 @@ func CreateBatch(productId int, pickupPlaceId int, stock int, price float64, pic
     res.Status = http.StatusOK
     res.Message = "Success to add batch!"
     res.Data = map[string]int64{"LastBatchId": id}
+
+    return res, nil
+}
+
+func UpdateBatch(batchId int, pickupPlaceId int, stock int, price float64, pickupTime string, closeOrderTime string) (Response, error) {
+    var res Response
+
+    con := db.CreateCon()
+
+    var updateValues []interface{}
+    var sqlValues []string
+
+    columns := []struct {
+        name  string
+        value any
+    }{
+        {"store_pickup_place_id", pickupPlaceId},
+        {"stock", stock},
+        {"price", price},
+        {"pickup_time", pickupTime},
+        {"close_order_time", closeOrderTime},
+    }
+
+    for _, col := range columns {
+        switch v := col.value.(type) {
+        case int:
+            if v != 0 {
+                sqlValues = append(sqlValues, col.name+" = $"+strconv.Itoa(len(updateValues)+1))
+                updateValues = append(updateValues, col.value)
+            }
+        case float64:
+            if v != 0.0 {
+                sqlValues = append(sqlValues, col.name+" = $"+strconv.Itoa(len(updateValues)+1))
+                updateValues = append(updateValues, col.value)
+            }
+        case string:
+            if v != "" {
+                sqlValues = append(sqlValues, col.name+" = $"+strconv.Itoa(len(updateValues)+1))
+                updateValues = append(updateValues, col.value)
+            }
+        }
+    }
+
+    if len(sqlValues) == 0 {
+        res.Success = false
+        res.Status = http.StatusBadRequest
+        res.Message = "No data to update"
+        return res, fmt.Errorf("no data to update")
+    }
+
+    updateValues = append(updateValues, batchId)
+
+    sqlStatement := "UPDATE \"batches\" SET " + strings.Join(sqlValues, ", ") + " WHERE batch_id = $" + strconv.Itoa(len(updateValues)) + ";"
+
+    stmt, err := con.Prepare(sqlStatement)
+    if err != nil {
+        return res, err
+    }
+    defer stmt.Close()
+
+    result, err := stmt.Exec(updateValues...)
+    if err != nil {
+        return res, err
+    }
+
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        return res, err
+    }   
+
+    if rowsAffected == 0 {
+		res.Status = http.StatusNotFound
+		res.Message = "No batch found with the given id"
+		res.Success = false
+		return res, fmt.Errorf("no batch found with the given id")
+	}
+
+    res.Success = true
+    res.Status = http.StatusOK
+    res.Message = "Success update batch!"
+    res.Data = map[string]int64{"rowsAffected   ": rowsAffected}
 
     return res, nil
 }
