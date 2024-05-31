@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/lib/pq"
 )
 
 type Store struct {
@@ -161,6 +159,69 @@ func CreateStore(userId int, name string, photoProfile string, whatsappNumber st
     var res Response
 
     con := db.CreateCon()
+    defer con.Close()
+
+    var existingStoreId int
+    var closedAt sql.NullTime
+    checkStoreQuery := `
+        SELECT store_id, closed_at
+        FROM "store"
+        WHERE user_id = $1; 
+    `
+    err := con.QueryRow(checkStoreQuery, userId).Scan(&existingStoreId, &closedAt)
+    if err != nil && err != sql.ErrNoRows {
+        return res, err
+    }
+
+    if existingStoreId != 0 && !closedAt.Valid {
+        res.Success = false
+        res.Status = http.StatusConflict
+        res.Message = "User already has an active store"
+        return res, nil
+    }
+
+    if existingStoreId != 0 && closedAt.Valid {
+        updateQuery := `
+            UPDATE "store"
+            SET closed_at = NULL
+            WHERE store_id = $1;
+        `
+        stmt, err := con.Prepare(updateQuery)
+        if err != nil {
+            return res, err
+        }
+        defer stmt.Close()
+
+        _, err = stmt.Exec(existingStoreId)
+        if err != nil {
+            return res, err
+        }
+
+        res.Success = true
+        res.Status = http.StatusOK
+        res.Message = "Success to restore store"
+        res.Data = map[string]int{"RestoreStoreId": existingStoreId}
+        return res, nil
+    }
+
+    var existingStoreNameId int
+    var existingStoreClosedAt sql.NullTime
+    checkStoreNameQuery := `
+        SELECT store_id, closed_at
+        FROM "store"
+        WHERE name = $1; 
+    `
+    err = con.QueryRow(checkStoreNameQuery, name).Scan(&existingStoreNameId, &existingStoreClosedAt)
+    if err != nil && err != sql.ErrNoRows {
+        return res, err
+    }
+
+    if existingStoreNameId != 0 && !existingStoreClosedAt.Valid {
+        res.Success = false
+        res.Status = http.StatusConflict
+        res.Message = "A store with the same name already exists"
+        return res, nil
+    }
 
     sqlStatement := `
         INSERT INTO "store" (user_id, name, photo_profile, whatsapp_number) 
@@ -174,24 +235,20 @@ func CreateStore(userId int, name string, photoProfile string, whatsappNumber st
     }
     defer stmt.Close()
 
-    var id int64
+    var id int
     err = stmt.QueryRow(userId, name, photoProfile, whatsappNumber).Scan(&id)
     if err != nil {
-        if pqErr, ok := err.(*pq.Error); ok {
-            if pqErr.Code.Name() == "unique_name" {
-                return res, fmt.Errorf("a store with the same name already exists")
-            }
-        }
         return res, err
     }
 
-	res.Success = true
+    res.Success = true
     res.Status = http.StatusOK
-    res.Message = fmt.Sprintf("Success to create new store:%s", name)
-    res.Data = map[string]int64{"LastStoreId": id}
+    res.Message = fmt.Sprintf("Success to create new store: %s", name)
+    res.Data = map[string]int{"LastStoreId": id}
 
     return res, nil
 }
+
 
 func UpdateStore(storeId int, storeName string, photoProfile string, whatsappNumber string) (Response, error) {
     var res Response
@@ -210,18 +267,6 @@ func UpdateStore(storeId int, storeName string, photoProfile string, whatsappNum
         {"photo_profile", photoProfile},
         {"whatsapp_number", whatsappNumber},
     }
-
-    // Check for duplicate store name
-    // if storeName != "" {
-    //     var existingStoreId int 
-    //     err := con.QueryRow("SELECT store_id FROM \"store\" WHERE name = $1 AND store_id != $2", storeName, storeId).Scan(&existingStoreId)
-    //     if err != nil && err != sql.ErrNoRows {
-    //         return res, err
-    //     }
-    //     if existingStoreId != 0 {
-    //         return res, fmt.Errorf("a store with the same name already exists")
-    //     }
-    // }
 
     // Prepare SQL set clauses and parameter values
     for _, col := range columns {
