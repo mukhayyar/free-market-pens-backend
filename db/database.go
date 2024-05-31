@@ -11,12 +11,11 @@ var db *sql.DB
 var err error
 
 func Init() {
-	db, err = sql.Open("postgres", "user=postgres password=Mantablah1 dbname=free-market sslmode=disable")
+	db, err = sql.Open("postgres", "user=postgres password=123 dbname=free-market sslmode=disable")
 	if err != nil {
 		fmt.Println("Error connecting to database:", err)
 		return
 	}
-
 
 	// db.SetMaxIdleConns(5)
 	// db.SetMaxOpenConns(20)
