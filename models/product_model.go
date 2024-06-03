@@ -275,9 +275,6 @@ func CreateProduct(storeId int, photo string, name string, description string) (
     return res, nil
 }
 
-
-
-
 func UpdateProduct(productId int, photo string, name string, description string) (Response, error) {
     var res Response
 

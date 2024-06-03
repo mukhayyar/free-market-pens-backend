@@ -2,10 +2,10 @@ package models
 
 import (
 	"backend/db"
+	"database/sql"
 	"fmt"
 	"net/http"
-
-	"github.com/lib/pq"
+	"time"
 )
 
 type StorePickupPlace struct {
@@ -25,7 +25,7 @@ func GetAllStorePickupPlace(storeId int) (Response, error) {
     sqlStatement := `
         SELECT store_pickup_place_id, store_id, name
         FROM store_pickup_place
-        WHERE store_id = $1;
+        WHERE store_id = $1 AND deleted_at IS NULL;
     `
     rows, err := con.Query(sqlStatement, storeId)
     if err != nil {
@@ -54,6 +54,49 @@ func CreateStorePickupPlace(storeId int, name string) (Response, error) {
 
     con := db.CreateCon()
 
+    var existingStorePickupPlaceId int
+    var deletedAt sql.NullTime
+    checkPlaceQuery := `
+        SELECT store_pickup_place_id, deleted_at
+        FROM "store_pickup_place"
+        WHERE store_id = $1 AND name = $2;
+    `
+    err := con.QueryRow(checkPlaceQuery, storeId, name).Scan(&existingStorePickupPlaceId, &deletedAt)
+    if err != nil && err != sql.ErrNoRows{
+        return res, err
+    }
+
+    if existingStorePickupPlaceId != 0 && !deletedAt.Valid {
+        res.Success = false
+        res.Status = http.StatusConflict
+        res.Message = "Place already exist"
+        return res, nil
+    }
+
+    if existingStorePickupPlaceId != 0 && deletedAt.Valid {
+        updateQuery := `
+            UPDATE "store_pickup_place"
+            SET deleted_at = NULL
+            WHERE store_pickup_place_id = $1;
+        `
+        stmt, err := con.Prepare(updateQuery)
+        if err != nil {
+            return res, err
+        }
+        defer stmt.Close()
+
+        _, err = stmt.Exec(existingStorePickupPlaceId)
+        if err != nil {
+            return res, err
+        }
+
+        res.Success = true
+        res.Status = http.StatusOK
+        res.Message = "Success to restore place"
+        res.Data = map[string]int{"RestoreStorePickupPlaceId": existingStorePickupPlaceId}
+        return res, nil
+    }
+
     sqlStatement := `
 		INSERT INTO "store_pickup_place" (store_id, name) 
 		VALUES($1, $2) 
@@ -69,11 +112,6 @@ func CreateStorePickupPlace(storeId int, name string) (Response, error) {
     var id int64
     err = stmt.QueryRow(storeId, name).Scan(&id)
     if err != nil {
-        if pqErr, ok := err.(*pq.Error); ok {
-            if pqErr.Code.Name() == "unique_store_pickup_place" {
-                return res, fmt.Errorf("a place with the same name already exists")
-            }
-        }
         return res, err
     }
 
@@ -84,3 +122,91 @@ func CreateStorePickupPlace(storeId int, name string) (Response, error) {
 
     return res, nil
 }
+
+func UpdateStorePickupPlace(storePickupPlaceId int, storeId int, name string) (Response, error) {
+    var res Response
+
+    con := db.CreateCon()
+    // defer con.Close()
+
+    var existingPlaceId int
+    checkPlaceQuery := `
+        SELECT store_pickup_place_id
+        FROM "store_pickup_place"
+        WHERE store_id = $1 AND name = $2;
+    `
+    err := con.QueryRow(checkPlaceQuery, storeId, name).Scan(&existingPlaceId)
+    if err != nil && err != sql.ErrNoRows{
+        return res, err
+    }
+
+    if existingPlaceId != 0 || name == ""{
+        res.Success = false
+        res.Status = http.StatusBadRequest
+        res.Message = "No data to update"
+        return res, nil
+    }
+
+    updateStatement := `
+        UPDATE "store_pickup_place"
+        SET name = $2
+        WHERE store_pickup_place_id = $1;
+    `
+    stmt, err := con.Prepare(updateStatement)
+    if err != nil {
+        return res, fmt.Errorf("failed to prepare update statement")
+    }
+    defer stmt.Close()
+
+    result, err := stmt.Exec(storePickupPlaceId, name)
+    if err != nil {
+        return res, fmt.Errorf("failed to execute update statement")
+    }
+    
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        return res, fmt.Errorf("failed to retrieve affected rows")
+    }
+    
+    res.Success = true
+    res.Status = http.StatusOK
+    res.Message = "Success to update store pickup place"
+    res.Data = map[string]int64{"rowsAffected": rowsAffected}
+    
+    return res, nil
+}
+
+func DeleteStorePickupPlace(storePickupPlaceId int) (Response, error) {
+    var res Response
+    
+    con := db.CreateCon()
+    // defer con.Close()
+    
+    deletedAt := time.Now()
+    sqlStatement := `
+        UPDATE "store_pickup_place"
+        SET deleted_at = $2
+        WHERE store_pickup_place_id = $1;
+    `
+    stmt, err := con.Prepare(sqlStatement)
+    if err != nil {
+        return res, fmt.Errorf("failed to prepare update statement") 
+    }
+    
+    result, err := stmt.Exec(storePickupPlaceId, deletedAt)
+    if err != nil {
+        return res, fmt.Errorf("failed to execute update statement")
+    }
+    
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        return res, fmt.Errorf("failed to retrieve affected rows")
+    }
+
+    res.Success = true
+    res.Status = http.StatusOK
+    res.Message = "Success to delete store pickup place"
+    res.Data = map[string]int64{"rowsAffected":rowsAffected}
+
+    return res, nil
+}   

@@ -43,8 +43,11 @@ func Init() *echo.Echo {
 	// product for buyer
 	e.GET("/products", product_controller.GetAllProduct)
 
-	e.GET("/storePickupPlace/:storeId", store_pickup_place_controller.GetAllStorePickupPlace)
-	e.POST("/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace)
+	// pickup place 
+	e.GET("stores/:storeId/storePickupPlace", store_pickup_place_controller.GetAllStorePickupPlace)
+	e.POST("stores/:storeId/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace)
+	e.PUT("stores/:storeId/storePickupPlace/:storePickupPlaceId", store_pickup_place_controller.UpdateStorePickupPlace)
+	e.DELETE("stores/:storeId/storePickupPlace/:storePickupPlaceId", store_pickup_place_controller.DeleteStorePickupPlace)
 	
 	// batches
 	e.POST("/stores/:storeId/products/:productId", batch_controller.CreateBatch)
