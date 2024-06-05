@@ -41,6 +41,10 @@ func CreateUser(c echo.Context) error {
 	whatsappNumber := c.FormValue("whatsappNumber")
 	password := c.FormValue("password")
 
+	if email == "" || username == "" || password == "" || whatsappNumber == "" {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "data can't be empty"})
+	}
+
 	result, err := models.CreateUser(email, username, whatsappNumber, password)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})

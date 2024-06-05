@@ -159,7 +159,7 @@ func CreateStore(userId int, name string, photoProfile string, whatsappNumber st
     var res Response
 
     con := db.CreateCon()
-    defer con.Close()
+    // defer con.Close()
 
     var existingStoreId int
     var closedAt sql.NullTime

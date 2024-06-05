@@ -60,6 +60,15 @@ func Init() *echo.Echo {
 	e.GET("/storePickupPlace/:storeId", store_pickup_place_controller.GetAllStorePickupPlace, auth_controller.JWTMiddleware)
 	e.POST("/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace, auth_controller.JWTMiddleware)
 
+<<<<<<< HEAD
+=======
+	// pickup place 
+	e.GET("stores/:storeId/storePickupPlace", store_pickup_place_controller.GetAllStorePickupPlace)
+	e.POST("stores/:storeId/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace)
+	e.PUT("stores/:storeId/storePickupPlace/:storePickupPlaceId", store_pickup_place_controller.UpdateStorePickupPlace)
+	e.DELETE("stores/:storeId/storePickupPlace/:storePickupPlaceId", store_pickup_place_controller.DeleteStorePickupPlace)
+	
+>>>>>>> 61aa2773c90cc2ffbb12d8fbbeca84cf752828b4
 	// batches
 	e.POST("/stores/:storeId/products/:productId", batch_controller.CreateBatch, auth_controller.JWTMiddleware)
 	e.PUT("/stores/:storeId/products/:productId/:batchId", batch_controller.UpdateBatch, auth_controller.JWTMiddleware)
