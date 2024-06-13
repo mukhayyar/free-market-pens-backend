@@ -28,45 +28,123 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
+func CheckUserHasStore(c echo.Context) error {
+	userIdStr := c.Param("userId")
+	if userIdStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "userId is required",
+			"data":    nil,
+		})
+	}
+
+	userId, err := strconv.Atoi(userIdStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "Invalid userId",
+			"data":    nil,
+		})
+	}
+
+	hasStore, err := models.CheckUserHasStore(userId)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusInternalServerError,
+			"message": "Error checking user store",
+			"data":    nil,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"status":  http.StatusOK,
+		"message": "User store check successful",
+		"data":    hasStore,
+	})
+}
+
 func GetMyStore(c echo.Context) error {
 	storeIdStr := c.Param("storeId")
-
 	if storeIdStr == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "storeId is required"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "storeId is required",
+			"data":    nil,
+		})
 	}
 
 	storeId, err := strconv.Atoi(storeIdStr)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid storeId"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "Invalid storeId",
+			"data":    nil,
+		})
 	}
 
 	result, err := models.GetMyStore(storeId)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusInternalServerError,
+			"message": err.Error(),
+			"data":    nil,
+		})
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"status":  http.StatusOK,
+		"message": "Store retrieved successfully",
+		"data":    result,
+	})
 }
 
 func GetStore(c echo.Context) error {
 	storeIdStr := c.Param("storeId")
-
 	if storeIdStr == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "storeId is required"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "storeId is required",
+			"data":    nil,
+		})
 	}
 
 	storeId, err := strconv.Atoi(storeIdStr)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid storeId"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "Invalid storeId",
+			"data":    nil,
+		})
 	}
 
 	result, err := models.GetStore(storeId)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusInternalServerError,
+			"message": err.Error(),
+			"data":    nil,
+		})
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"status":  http.StatusOK,
+		"message": "Store retrieved successfully",
+		"data":    result,
+	})
 }
+
 func uploadImageToImgbb(file multipart.File, fileHeader *multipart.FileHeader) (string, error) {
 	fileBytes, err := ioutil.ReadAll(file)
 	if err != nil {
@@ -115,31 +193,61 @@ func CreateStore(c echo.Context) error {
 	file, err := c.FormFile("photoProfile")
 
 	if userIdStr == "" || name == "" || whatsappNumber == "" || file == nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "data can't be empty"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "userId, name, whatsappNumber, and photoProfile are required",
+			"data":    nil,
+		})
 	}
 
 	userId, err := strconv.Atoi(userIdStr)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid userId"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "Invalid userId",
+			"data":    nil,
+		})
 	}
 
 	src, err := file.Open()
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Unable to open image file"})
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusInternalServerError,
+			"message": "Unable to open image file",
+			"data":    nil,
+		})
 	}
 	defer src.Close()
 
 	photoProfileURL, err := uploadImageToImgbb(src, file)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to upload image"})
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusInternalServerError,
+			"message": "Failed to upload image",
+			"data":    nil,
+		})
 	}
 
 	result, err := models.CreateStore(userId, name, photoProfileURL, whatsappNumber)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusInternalServerError,
+			"message": err.Error(),
+			"data":    nil,
+		})
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"status":  http.StatusOK,
+		"message": "Store created successfully",
+		"data":    result,
+	})
 }
 
 func UpdateStore(c echo.Context) error {
@@ -149,52 +257,102 @@ func UpdateStore(c echo.Context) error {
 	file, err := c.FormFile("photoProfile")
 
 	if storeIdStr == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "storeId is required"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "storeId is required",
+			"data":    nil,
+		})
 	}
 
 	storeId, err := strconv.Atoi(storeIdStr)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid storeId"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "Invalid storeId",
+			"data":    nil,
+		})
 	}
 
 	var photoProfileURL string
 	if file != nil {
 		src, err := file.Open()
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Unable to open image file"})
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"success": false,
+				"status":  http.StatusInternalServerError,
+				"message": "Unable to open image file",
+				"data":    nil,
+			})
 		}
 		defer src.Close()
 
 		photoProfileURL, err = uploadImageToImgbb(src, file)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Failed to upload image"})
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"success": false,
+				"status":  http.StatusInternalServerError,
+				"message": "Failed to upload image",
+				"data":    nil,
+			})
 		}
 	}
 
 	result, err := models.UpdateStore(storeId, name, photoProfileURL, whatsappNumber)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusInternalServerError,
+			"message": err.Error(),
+			"data":    nil,
+		})
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"status":  http.StatusOK,
+		"message": "Store updated successfully",
+		"data":    result,
+	})
 }
 
 func CloseStore(c echo.Context) error {
 	storeIdStr := c.Param("storeId")
 
 	if storeIdStr == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "storeId is required"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "storeId is required",
+			"data":    nil,
+		})
 	}
 
 	storeId, err := strconv.Atoi(storeIdStr)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid storeId"})
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusBadRequest,
+			"message": "Invalid storeId",
+			"data":    nil,
+		})
 	}
 
 	result, err := models.CloseStore(storeId)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"success": false,
+			"status":  http.StatusInternalServerError,
+			"message": err.Error(),
+			"data":    nil,
+		})
 	}
 
-	return c.JSON(http.StatusOK, result)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success": true,
+		"status":  http.StatusOK,
+		"message": "Store closed successfully",
+		"data":    result,
+	})
 }

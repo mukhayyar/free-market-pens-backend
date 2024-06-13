@@ -22,6 +22,12 @@ func Init() *echo.Echo {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"}, // Replace with your frontend origin
+		AllowMethods: []string{echo.GET, echo.HEAD, echo.PUT, echo.PATCH, echo.POST, echo.DELETE},
+		AllowHeaders: []string{echo.HeaderAuthorization, echo.HeaderContentType},
+	}))
+
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Hello, World!")
 	})
@@ -32,6 +38,15 @@ func Init() *echo.Echo {
 	e.GET("/validate-token", auth_controller.ValidateToken, auth_controller.JWTMiddleware)
 	e.POST("/refresh-token", auth_controller.RefreshToken)
 
+	e.GET("/profile", user_controller.GetProfile, auth_controller.JWTMiddleware)
+	// Routes
+	e.PUT("/update-password", user_controller.UpdatePassword, auth_controller.JWTMiddleware)
+	e.PUT("/update-whatsapp", user_controller.UpdateWhatsappNumber, auth_controller.JWTMiddleware)
+	e.PUT("/admin/update-whatsapp", user_controller.UpdateWhatsappNumber, auth_controller.JWTMiddleware)
+	e.PUT("/admin/update-password", user_controller.UpdatePassword, auth_controller.JWTMiddleware)
+	e.PUT("/admin/update-is-admin", user_controller.UpdateIsAdmin, auth_controller.JWTMiddleware)
+	e.GET("/admin/users", user_controller.GetAllUsers, auth_controller.JWTMiddleware)
+
 	e.GET("/user/:userId", user_controller.GetUser, auth_controller.JWTMiddleware)
 	e.POST("/user", user_controller.CreateUser, auth_controller.JWTMiddleware)
 
@@ -39,6 +54,7 @@ func Init() *echo.Echo {
 	e.POST("/category", category_controller.CreateCategory, auth_controller.JWTMiddleware)
 
 	// store for seller
+	e.GET("/store/check/:userId", store_controller.CheckUserHasStore, auth_controller.JWTMiddleware)
 	e.GET("/stores/:storeId", store_controller.GetMyStore, auth_controller.JWTMiddleware)
 	e.POST("/stores", store_controller.CreateStore, auth_controller.JWTMiddleware)
 	e.PUT("/stores/:storeId", store_controller.UpdateStore, auth_controller.JWTMiddleware)
@@ -48,30 +64,25 @@ func Init() *echo.Echo {
 	e.GET("/home/:storeId", store_controller.GetStore, auth_controller.JWTMiddleware)
 
 	// product for seller
-	e.GET("/stores/:storeId/products", product_controller.GetAllMyProduct, auth_controller.JWTMiddleware)
-	e.GET("/stores/:storeId/products/:productId", product_controller.GetMyProductDetail, auth_controller.JWTMiddleware)
-	e.POST("/stores/:storeId/products", product_controller.CreateProduct, auth_controller.JWTMiddleware)
-	e.PUT("/stores/:storeId/products/:productId", product_controller.UpdateProduct, auth_controller.JWTMiddleware)
-	e.DELETE("/stores/:storeId/products/:productId", product_controller.DeleteProduct, auth_controller.JWTMiddleware)
+	e.GET("/store/products", product_controller.GetAllMyProduct, auth_controller.JWTMiddleware)
+	e.GET("/store/products/:productId", product_controller.GetMyProductDetail, auth_controller.JWTMiddleware)
+	e.POST("/store/products", product_controller.CreateProduct, auth_controller.JWTMiddleware)
+	e.PUT("/store/products/:productId", product_controller.UpdateProduct, auth_controller.JWTMiddleware)
+	e.DELETE("/store/products/:productId", product_controller.DeleteProduct, auth_controller.JWTMiddleware)
 
 	// product for buyer
 	e.GET("/products", product_controller.GetAllProduct, auth_controller.JWTMiddleware)
+	e.GET("/store/:id/products", product_controller.GetAllProduct, auth_controller.JWTMiddleware)
 
-	e.GET("/storePickupPlace/:storeId", store_pickup_place_controller.GetAllStorePickupPlace, auth_controller.JWTMiddleware)
-	e.POST("/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace, auth_controller.JWTMiddleware)
+	// pickup place
+	e.GET("/store/storePickupPlace", store_pickup_place_controller.GetAllStorePickupPlace)
+	e.POST("/store/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace)
+	e.PUT("/store/storePickupPlace/:storePickupPlaceId", store_pickup_place_controller.UpdateStorePickupPlace)
+	e.DELETE("/store/storePickupPlace/:storePickupPlaceId", store_pickup_place_controller.DeleteStorePickupPlace)
 
-<<<<<<< HEAD
-=======
-	// pickup place 
-	e.GET("stores/:storeId/storePickupPlace", store_pickup_place_controller.GetAllStorePickupPlace)
-	e.POST("stores/:storeId/storePickupPlace", store_pickup_place_controller.CreateStorePickupPlace)
-	e.PUT("stores/:storeId/storePickupPlace/:storePickupPlaceId", store_pickup_place_controller.UpdateStorePickupPlace)
-	e.DELETE("stores/:storeId/storePickupPlace/:storePickupPlaceId", store_pickup_place_controller.DeleteStorePickupPlace)
-	
->>>>>>> 61aa2773c90cc2ffbb12d8fbbeca84cf752828b4
 	// batches
-	e.POST("/stores/:storeId/products/:productId", batch_controller.CreateBatch, auth_controller.JWTMiddleware)
-	e.PUT("/stores/:storeId/products/:productId/:batchId", batch_controller.UpdateBatch, auth_controller.JWTMiddleware)
+	e.POST("/store/products/:productId/batch", batch_controller.CreateBatch, auth_controller.JWTMiddleware)
+	e.PUT("/store/products/:productId/batch/:batchId", batch_controller.UpdateBatch, auth_controller.JWTMiddleware)
 
 	// Transaction routes
 	e.GET("/transaction/:transactionID", transaction_controller.GetTransactionByID, auth_controller.JWTMiddleware)

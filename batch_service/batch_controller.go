@@ -38,22 +38,22 @@ func CreateBatch(c echo.Context) error {
 	}
 
 	price, err := strconv.ParseFloat(priceStr, 64)
-    if err != nil {
-        return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid price"})
-    }
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid price"})
+	}
 
 	pickupTime = pickupDate + " " + pickupTime
-    closeOrderTime = closeOrderDate + " " + closeOrderTime
+	closeOrderTime = closeOrderDate + " " + closeOrderTime
 
 	batchResult, err := models.CreateBatch(productId, pickupPlaceId, stock, price, pickupTime, closeOrderTime)
-	if err != nil{
+	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
 
 	response := map[string]interface{}{
 		"batchResult": batchResult,
 	}
-	
+
 	return c.JSON(http.StatusOK, response)
 }
 
@@ -67,47 +67,67 @@ func UpdateBatch(c echo.Context) error {
 	var pickupPlaceId int
 	var stock int
 	var price float64
-	
+
 	if batchIdStr == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "batchId is required"})
 	}
-	
+
 	batchId, err := strconv.Atoi(batchIdStr)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid batchId"})
 	}
 
 	if pickupPlaceIdStr == "" {
-        pickupPlaceId = 0
-    } else {
-        pickupPlaceId, err = strconv.Atoi(pickupPlaceIdStr)
-        if err != nil {
-            return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid pickupPlaceId"})
-        }
-    }
+		pickupPlaceId = 0
+	} else {
+		pickupPlaceId, err = strconv.Atoi(pickupPlaceIdStr)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid pickupPlaceId"})
+		}
+	}
 
-    if stockStr == "" {
-        stock = 0
-    } else {
-        stock, err = strconv.Atoi(stockStr)
-        if err != nil {
-            return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid stock"})
-        }
-    }
+	if stockStr == "" {
+		stock = 0
+	} else {
+		stock, err = strconv.Atoi(stockStr)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid stock"})
+		}
+	}
 
-    if priceStr == "" {
-        price = 0
-    } else {
-        price, err = strconv.ParseFloat(priceStr, 64)
-        if err != nil {
-            return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid price"})
-        }
-    }
-	
+	if priceStr == "" {
+		price = 0
+	} else {
+		price, err = strconv.ParseFloat(priceStr, 64)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid price"})
+		}
+	}
+
 	result, err := models.UpdateBatch(batchId, pickupPlaceId, stock, price, pickupTime, closeOrderTime)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
-	
+
+	return c.JSON(http.StatusOK, result)
+}
+
+func GetAllBatch(c echo.Context) error {
+	productIdStr := c.Param("productId")
+
+	if productIdStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "productId is required"})
+	}
+
+	productId, err := strconv.Atoi(productIdStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid productId"})
+	}
+
+	result, err := models.GetAllBatch(productId)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
+	}
+
 	return c.JSON(http.StatusOK, result)
 }

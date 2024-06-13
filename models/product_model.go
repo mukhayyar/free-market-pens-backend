@@ -15,7 +15,6 @@ type Product struct {
 	StoreId     int
 	Name        string
 	Photo       string
-	CategoryId  int
 	Description string
 	DeletedAt   string
 }
@@ -28,13 +27,13 @@ func GetMyProductDetail(productId int) (Response, error) {
 	// defer con.Close()
 
 	sqlStatement := `
-        SELECT product_id, photo, name, description
+        SELECT product_id, store_id, photo, name, description
         FROM "product"
         WHERE product_id = $1 AND deleted_at IS NULL;
     `
 	row := con.QueryRow(sqlStatement, productId)
 
-	err := row.Scan(&product.ProductId, &product.Photo, &product.Name, &product.Description)
+	err := row.Scan(&product.ProductId, &product.StoreId, &product.Photo, &product.Name, &product.Description)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return res, err
@@ -48,6 +47,7 @@ func GetMyProductDetail(productId int) (Response, error) {
 	res.Data = map[string]interface{}{
 		"product": map[string]interface{}{
 			"productId":    product.ProductId,
+			"storeId":      product.StoreId,
 			"name":         product.Name,
 			"productPhoto": product.Photo,
 			"description":  product.Description,

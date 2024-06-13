@@ -9,8 +9,6 @@ import (
 type Transaction struct {
 	TransactionID              int     `json:"transaction_id"`
 	UserID                     int     `json:"user_id"`
-	ProductID                  int     `json:"product_id"`
-	BatchID                    int     `json:"batch_id"`
 	TransactionDate            string  `json:"transaction_date"`
 	TotalPayment               float64 `json:"total_payment"`
 	Quantity                   int     `json:"quantity"`
@@ -26,7 +24,7 @@ func GetTransaction(transactionID int) (Response, error) {
 	con := db.CreateCon()
 	sqlStatement := `SELECT * FROM transactions WHERE transaction_id = $1`
 	row := con.QueryRow(sqlStatement, transactionID)
-	err := row.Scan(&transaction.TransactionID, &transaction.UserID, &transaction.ProductID, &transaction.BatchID, &transaction.TransactionDate, &transaction.TotalPayment, &transaction.Quantity, &transaction.TransactionStatus, &transaction.CancelledTransactionDate, &transaction.CancelledTransactionReason)
+	err := row.Scan(&transaction.TransactionID, &transaction.UserID, &transaction.TransactionDate, &transaction.TotalPayment, &transaction.Quantity, &transaction.TransactionStatus, &transaction.CancelledTransactionDate, &transaction.CancelledTransactionReason)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return res, err
@@ -56,7 +54,7 @@ func GetTransactionsByUserID(userID int) (Response, error) {
 
 	for rows.Next() {
 		var transaction Transaction
-		err := rows.Scan(&transaction.TransactionID, &transaction.UserID, &transaction.ProductID, &transaction.BatchID, &transaction.TransactionDate, &transaction.TotalPayment, &transaction.Quantity, &transaction.TransactionStatus, &transaction.CancelledTransactionDate, &transaction.CancelledTransactionReason)
+		err := rows.Scan(&transaction.TransactionID, &transaction.UserID, &transaction.TransactionDate, &transaction.TotalPayment, &transaction.Quantity, &transaction.TransactionStatus, &transaction.CancelledTransactionDate, &transaction.CancelledTransactionReason)
 		if err != nil {
 			return res, err
 		}
@@ -89,7 +87,7 @@ func GetTransactionsByProductID(productID int) (Response, error) {
 
 	for rows.Next() {
 		var transaction Transaction
-		err := rows.Scan(&transaction.TransactionID, &transaction.UserID, &transaction.ProductID, &transaction.BatchID, &transaction.TransactionDate, &transaction.TotalPayment, &transaction.Quantity, &transaction.TransactionStatus, &transaction.CancelledTransactionDate, &transaction.CancelledTransactionReason)
+		err := rows.Scan(&transaction.TransactionID, &transaction.UserID, &transaction.TransactionDate, &transaction.TotalPayment, &transaction.Quantity, &transaction.TransactionStatus, &transaction.CancelledTransactionDate, &transaction.CancelledTransactionReason)
 		if err != nil {
 			return res, err
 		}
@@ -122,7 +120,7 @@ func GetTransactionsByBatchID(batchID int) (Response, error) {
 
 	for rows.Next() {
 		var transaction Transaction
-		err := rows.Scan(&transaction.TransactionID, &transaction.UserID, &transaction.ProductID, &transaction.BatchID, &transaction.TransactionDate, &transaction.TotalPayment, &transaction.Quantity, &transaction.TransactionStatus, &transaction.CancelledTransactionDate, &transaction.CancelledTransactionReason)
+		err := rows.Scan(&transaction.TransactionID, &transaction.UserID, &transaction.TransactionDate, &transaction.TotalPayment, &transaction.Quantity, &transaction.TransactionStatus, &transaction.CancelledTransactionDate, &transaction.CancelledTransactionReason)
 		if err != nil {
 			return res, err
 		}
@@ -141,17 +139,17 @@ func GetTransactionsByBatchID(batchID int) (Response, error) {
 	return res, nil
 }
 
-func CreateTransaction(userID, productID, batchID int, transactionDate string, totalPayment float64, quantity int, transactionStatus, cancelledTransactionDate, cancelledTransactionReason string) (Response, error) {
+func CreateTransaction(userID int, transactionDate string, totalPayment float64, quantity int, transactionStatus, cancelledTransactionDate, cancelledTransactionReason string) (Response, error) {
 	var res Response
 
 	con := db.CreateCon()
 	sqlStatement := `
-		INSERT INTO transactions (user_id, product_id, batch_id, transaction_date, total_payment, quantity, transaction_status, cancelled_transaction_date, cancelled_transaction_reason) 
+		INSERT INTO transactions (user_id,  transaction_date, total_payment, quantity, transaction_status, cancelled_transaction_date, cancelled_transaction_reason) 
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING transaction_id;
 	`
 	var transactionID int
-	err := con.QueryRow(sqlStatement, userID, productID, batchID, transactionDate, totalPayment, quantity, transactionStatus, cancelledTransactionDate, cancelledTransactionReason).Scan(&transactionID)
+	err := con.QueryRow(sqlStatement, userID, transactionDate, totalPayment, quantity, transactionStatus, cancelledTransactionDate, cancelledTransactionReason).Scan(&transactionID)
 	if err != nil {
 		return res, err
 	}
@@ -164,7 +162,7 @@ func CreateTransaction(userID, productID, batchID int, transactionDate string, t
 	return res, nil
 }
 
-func UpdateTransaction(transactionID, userID, productID, batchID int, transactionDate string, totalPayment float64, quantity int, transactionStatus, cancelledTransactionDate, cancelledTransactionReason string) (Response, error) {
+func UpdateTransaction(transactionID int, userID int, transactionDate string, totalPayment float64, quantity int, transactionStatus, cancelledTransactionDate, cancelledTransactionReason string) (Response, error) {
 	var res Response
 
 	con := db.CreateCon()
@@ -173,7 +171,7 @@ func UpdateTransaction(transactionID, userID, productID, batchID int, transactio
 		SET user_id = $1, product_id = $2, batch_id = $3, transaction_date = $4, total_payment = $5, quantity = $6, transaction_status = $7, cancelled_transaction_date = $8, cancelled_transaction_reason = $9
 		WHERE transaction_id = $10;
 	`
-	result, err := con.Exec(sqlStatement, userID, productID, batchID, transactionDate, totalPayment, quantity, transactionStatus, cancelledTransactionDate, cancelledTransactionReason, transactionID)
+	result, err := con.Exec(sqlStatement, userID, transactionDate, totalPayment, quantity, transactionStatus, cancelledTransactionDate, cancelledTransactionReason, transactionID)
 	if err != nil {
 		return res, err
 	}

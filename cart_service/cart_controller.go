@@ -47,10 +47,10 @@ func GetCartsByUserID(c echo.Context) error {
 
 func CreateCart(c echo.Context) error {
 	userIDStr := c.FormValue("user_id")
-	productIDStr := c.FormValue("product_id")
+	batchIDStr := c.FormValue("batch_id")
 	quantityStr := c.FormValue("quantity")
 
-	if userIDStr == "" || productIDStr == "" || quantityStr == "" {
+	if userIDStr == "" || batchIDStr == "" || quantityStr == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "data can't be empty"})
 	}
 
@@ -59,7 +59,7 @@ func CreateCart(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid user ID"})
 	}
 
-	productID, err := strconv.Atoi(productIDStr)
+	batchID, err := strconv.Atoi(batchIDStr)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid product ID"})
 	}
@@ -69,7 +69,7 @@ func CreateCart(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid quantity"})
 	}
 
-	res, err := models.CreateCart(userID, productID, quantity)
+	res, err := models.CreateCart(userID, batchID, quantity)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}

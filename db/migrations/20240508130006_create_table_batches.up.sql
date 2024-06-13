@@ -3,8 +3,6 @@ CREATE TABLE batches (
     product_id INT REFERENCES "product"(product_id),
     store_pickup_place_id INT REFERENCES "store_pickup_place"(store_pickup_place_id),
     stock INT NOT NULL,
-    close_order_date DATE NOT NULL,
     close_order_time TIMESTAMP,
-    pickup_date DATE NOT NULL,
     pickup_time TIMESTAMP
 );

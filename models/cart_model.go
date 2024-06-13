@@ -73,17 +73,17 @@ func GetCartsByUserID(userID int) (Response, error) {
 }
 
 // CreateCart adds a new item to the cart
-func CreateCart(userID, productID, quantity int) (Response, error) {
+func CreateCart(userID, batchID, quantity int) (Response, error) {
 	var res Response
 
 	con := db.CreateCon()
 	sqlStatement := `
-		INSERT INTO cart (user_id, product_id, quantity) 
+		INSERT INTO cart (user_id, batch_id, quantity) 
 		VALUES ($1, $2, $3)
 		RETURNING cart_id;
 	`
 	var cartID int
-	err := con.QueryRow(sqlStatement, userID, productID, quantity).Scan(&cartID)
+	err := con.QueryRow(sqlStatement, userID, batchID, quantity).Scan(&cartID)
 	if err != nil {
 		return res, err
 	}

@@ -85,7 +85,7 @@ func CreateTransaction(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid request payload"})
 	}
 
-	res, err := models.CreateTransaction(transaction.UserID, transaction.ProductID, transaction.BatchID, transaction.TransactionDate, transaction.TotalPayment, transaction.Quantity, transaction.TransactionStatus, transaction.CancelledTransactionDate, transaction.CancelledTransactionReason)
+	res, err := models.CreateTransaction(transaction.UserID, transaction.TransactionDate, transaction.TotalPayment, transaction.Quantity, transaction.TransactionStatus, transaction.CancelledTransactionDate, transaction.CancelledTransactionReason)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
@@ -105,7 +105,7 @@ func UpdateTransaction(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid request payload"})
 	}
 
-	res, err := models.UpdateTransaction(transactionID, transaction.UserID, transaction.ProductID, transaction.BatchID, transaction.TransactionDate, transaction.TotalPayment, transaction.Quantity, transaction.TransactionStatus, transaction.CancelledTransactionDate, transaction.CancelledTransactionReason)
+	res, err := models.UpdateTransaction(transactionID, transaction.UserID, transaction.TransactionDate, transaction.TotalPayment, transaction.Quantity, transaction.TransactionStatus, transaction.CancelledTransactionDate, transaction.CancelledTransactionReason)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}

@@ -4,6 +4,7 @@ package auth_controller
 import (
 	"backend/models"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -15,10 +16,11 @@ import (
 var jwtKey = []byte("my_secret_key")
 
 type Credentials struct {
-	Email          string `json:"email"`
-	Password       string `json:"password"`
-	Username       string `json:"username"`
-	WhatsappNumber string `json:"whatsapp_number"`
+	Email                string `json:"email"`
+	Password             string `json:"password"`
+	PasswordConfirmation string `json:"password_confirmation"`
+	Username             string `json:"username"`
+	WhatsappNumber       string `json:"whatsapp_number"`
 }
 
 type Claims struct {
@@ -32,12 +34,21 @@ func Register(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid request payload"})
 	}
 
+	fmt.Println("Email:", creds.Password)
+	fmt.Println("Username:", creds.Username)
+	fmt.Println("WhatsappNumber:", creds.WhatsappNumber)
+
+	// Check if password and password confirmation match
+	if creds.Password != creds.PasswordConfirmation {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Passwords do not match"})
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(creds.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Error hashing password"})
 	}
 
-	res, err := models.CreateUser(creds.Email, creds.Username, "", string(hashedPassword))
+	res, err := models.CreateUser(creds.Email, creds.Username, creds.WhatsappNumber, string(hashedPassword))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": err.Error()})
 	}
@@ -50,9 +61,11 @@ func Login(c echo.Context) error {
 	if err := c.Bind(&creds); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid request payload"})
 	}
-
+	fmt.Println(creds.Email)
 	res, err := models.GetUserByEmail(creds.Email)
+	fmt.Println(res)
 	if err != nil {
+		fmt.Println(err)
 		if err == sql.ErrNoRows {
 			return c.JSON(http.StatusUnauthorized, map[string]string{"message": "Invalid credentials"})
 		}
@@ -60,6 +73,7 @@ func Login(c echo.Context) error {
 	}
 
 	user := res.Data.(models.User)
+	fmt.Println(user)
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(creds.Password)); err != nil {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"message": "Invalid credentials"})
 	}
@@ -78,9 +92,11 @@ func Login(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Error generating token"})
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{
-		"status": "success",
-		"token":  tokenString,
+	return c.JSON(http.StatusOK, map[string]any{
+		"success": "true",
+		"status":  http.StatusOK,
+		"message": "Success to login!",
+		"token":   tokenString,
 	})
 }
 
